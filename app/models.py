@@ -10,10 +10,14 @@ from app.db import BaseModel
 class LinkModel(BaseModel):
     __tablename__ = "links"
 
+    # the short code itself is the primary key — that's the "short URL"
     code: Mapped[str] = mapped_column(primary_key=True)
     original_url: Mapped[str]
+    # server_default lets Postgres stamp the timestamp, so it's correct
+    # even for rows inserted outside of this app
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
+    # all clicks recorded for this link; deleting a link cascades to its clicks
     clicks: Mapped[list["StatsModel"]] = relationship(
         back_populates="link", cascade="all, delete-orphan"
     )
@@ -25,6 +29,8 @@ class StatsModel(BaseModel):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     link_code: Mapped[str] = mapped_column(ForeignKey("links.code"))
+    # stored so /stats can tell total clicks (COUNT(*)) apart from
+    # unique clicks (COUNT(DISTINCT ip_address))
     ip_address: Mapped[str | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
