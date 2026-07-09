@@ -1,9 +1,20 @@
+import secrets
+import string
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import RedirectResponse
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from . import models  # noqa: F401  register models in BaseModel.metadata
-from .db import init_models
+from .db import get_db, init_models
+from .models import LinkModel, StatsModel
 from .schemas import LinkCreate, LinkOut
+
+CODE_ALPHABET = string.ascii_letters + string.digits
+CODE_LENGTH = 7
+MAX_CODE_ATTEMPTS = 5
 
 
 # Create DB tables on startup before the app starts serving requests
@@ -16,20 +27,59 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
+def _generate_code() -> str:
+    return "".join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LENGTH))
+
+
 # Create a new short link for the given URL
-@app.post("", response_model=LinkOut, status_code=201)
-def create_link(payload: LinkCreate):
-    ...  # generate code, check for collision, INSERT
+@app.post("/", response_model=LinkOut, status_code=201)
+async def create_link(payload: LinkCreate, request: Request, db: AsyncSession = Depends(get_db)):
+    for _ in range(MAX_CODE_ATTEMPTS):
+        code = _generate_code()
+        if await db.get(LinkModel, code) is None:
+            break
+    else:
+        raise HTTPException(status_code=500, detail="Could not generate a unique code")
+
+    link = LinkModel(code=code, original_url=str(payload.url))
+    db.add(link)
+    await db.commit()
+    await db.refresh(link)
+
+    return LinkOut(
+        code=link.code,
+        short_url=str(request.base_url) + link.code,
+        original_url=link.original_url,
+        created_at=link.created_at,
+    )
 
 # Return total/unique click counts for a short link
 @app.get("/{code}/stats")
-def get_stats(code: str):
-    ...  # total/unique clicks + aggregations
+async def get_stats(code: str, db: AsyncSession = Depends(get_db)):
+    link = await db.get(LinkModel, code)
+    if link is None:
+        raise HTTPException(status_code=404)
+
+    total, unique = (
+        await db.execute(
+            select(
+                func.count(StatsModel.id),
+                func.count(func.distinct(StatsModel.ip_address)),
+            ).where(StatsModel.link_code == code)
+        )
+    ).one()
+
+    return {"code": code, "total_clicks": total, "unique_clicks": unique}
 
 # Delete a short link by its code
 @app.delete("/{code}", status_code=204)
-def delete_link(code: str):
-    ...
+async def delete_link(code: str, db: AsyncSession = Depends(get_db)):
+    link = await db.get(LinkModel, code)
+    if link is None:
+        raise HTTPException(status_code=404)
+
+    await db.delete(link)
+    await db.commit()
 
 # ---- Services ----
 # Liveness check for the API
@@ -40,6 +90,17 @@ def health():
 # ---- Catch-all redirect: use the latest ----
 # Resolve a short code, log the click, and redirect to the original URL
 @app.get("/{code}")
-def redirect(code: str):
-    ...  # SELECT → write click → RedirectResponse(original, status_code=302)
-    raise HTTPException(status_code=404)
+async def redirect(code: str, request: Request, db: AsyncSession = Depends(get_db)):
+    link = await db.get(LinkModel, code)
+    if link is None:
+        raise HTTPException(status_code=404)
+
+    db.add(
+        StatsModel(
+            link_code=code,
+            ip_address=request.client.host if request.client else None,
+        )
+    )
+    await db.commit()
+
+    return RedirectResponse(link.original_url, status_code=302)
