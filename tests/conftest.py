@@ -9,12 +9,12 @@ os.environ["DATABASE_URL"] = os.getenv(
     f"postgresql+asyncpg://postgres:postgres@localhost:5432/{TEST_DB_NAME}",
 )
 
-import asyncpg
-import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
+import asyncpg  # noqa: E402
+import pytest_asyncio  # noqa: E402
+from httpx import ASGITransport, AsyncClient  # noqa: E402
 
-from app.db import BaseModel, engine
-from app.main import app
+from app.db import BaseModel, engine  # noqa: E402
+from app.main import app  # noqa: E402
 
 MAINTENANCE_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/postgres"
 

@@ -3,6 +3,9 @@
 </p>
 
 # Tally
+
+[![CI](https://github.com/davydshcherba/Tally/actions/workflows/ci.yml/badge.svg)](https://github.com/davydshcherba/Tally/actions/workflows/ci.yml)
+
 A fast, self-hosted URL shortener with built-in click analytics.
 
 ## Features
@@ -52,8 +55,11 @@ By default the app connects to `postgresql+asyncpg://postgres:postgres@localhost
 Requires a running PostgreSQL instance (`docker compose up -d postgres`). Tests run against a separate `tally_test` database, created automatically on first run.
 
 ```bash
-uv run pytest
+uv run ruff check .   # lint
+uv run pytest         # tests
 ```
+
+Both run on every pull request via [GitHub Actions](.github/workflows/ci.yml).
 
 ## API reference
 
