@@ -47,6 +47,14 @@ uv run uvicorn app.main:app --reload
 
 By default the app connects to `postgresql+asyncpg://postgres:postgres@localhost:5432/postgres`. Override this with the `DATABASE_URL` environment variable.
 
+### Run tests
+
+Requires a running PostgreSQL instance (`docker compose up -d postgres`). Tests run against a separate `tally_test` database, created automatically on first run.
+
+```bash
+uv run pytest
+```
+
 ## API reference
 
 | Method   | Path           | Description                                    |
