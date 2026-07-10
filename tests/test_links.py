@@ -44,6 +44,19 @@ async def test_create_link_422_for_invalid_url(client):
     assert resp.status_code == 422
 
 
+async def test_create_link_rate_limited_per_ip(client):
+    for _ in range(10):
+        resp = await client.post("/", json={"url": "https://example.com/page"})
+        assert resp.status_code == 201
+
+    limited_resp = await client.post("/", json={"url": "https://example.com/page"})
+    assert limited_resp.status_code == 429
+
+    async with make_client("9.9.9.9") as other_ip_client:
+        other_resp = await other_ip_client.post("/", json={"url": "https://example.com/page"})
+        assert other_resp.status_code == 201
+
+
 async def test_unique_vs_total_click_counting(client):
     create_resp = await client.post("/", json={"url": "https://example.com/page"})
     code = create_resp.json()["code"]
