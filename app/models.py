@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, func
+from sqlalchemy import DateTime, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import BaseModel
@@ -16,6 +16,8 @@ class LinkModel(BaseModel):
     # server_default lets Postgres stamp the timestamp, so it's correct
     # even for rows inserted outside of this app
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    # optional TTL: once this passes, redirect should treat the link as gone
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # all clicks recorded for this link; deleting a link cascades to its clicks
     clicks: Mapped[list["StatsModel"]] = relationship(

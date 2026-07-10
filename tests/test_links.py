@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 from tests.conftest import make_client
 
 
@@ -55,6 +57,28 @@ async def test_create_link_rate_limited_per_ip(client):
     async with make_client("9.9.9.9") as other_ip_client:
         other_resp = await other_ip_client.post("/", json={"url": "https://example.com/page"})
         assert other_resp.status_code == 201
+
+
+async def test_redirect_410_for_expired_link(client):
+    past = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
+    create_resp = await client.post("/", json={"url": "https://example.com/page", "expires_at": past})
+    assert create_resp.status_code == 201
+    code = create_resp.json()["code"]
+
+    redirect_resp = await client.get(f"/{code}")
+    assert redirect_resp.status_code == 410
+
+
+async def test_redirect_succeeds_for_unexpired_link(client):
+    future = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
+    create_resp = await client.post("/", json={"url": "https://example.com/page", "expires_at": future})
+    assert create_resp.status_code == 201
+    body = create_resp.json()
+    code = body["code"]
+    assert body["expires_at"] is not None
+
+    redirect_resp = await client.get(f"/{code}")
+    assert redirect_resp.status_code == 302
 
 
 async def test_unique_vs_total_click_counting(client):

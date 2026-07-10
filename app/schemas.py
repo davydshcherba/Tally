@@ -4,6 +4,8 @@ from datetime import datetime
 # Request body for POST /: the URL the client wants shortened
 class LinkCreate(BaseModel):
     url: HttpUrl
+    # optional expiration timestamp; once past, the link stops redirecting
+    expires_at: datetime | None = None
 
 # Response body returned after creating (or looking up) a link
 class LinkOut(BaseModel):
@@ -11,3 +13,4 @@ class LinkOut(BaseModel):
     short_url: str
     original_url: HttpUrl
     created_at: datetime
+    expires_at: datetime | None = None
