@@ -4,6 +4,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.util import get_remote_address
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,6 +30,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
 
 def _generate_code() -> str:
     return "".join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LENGTH))
@@ -33,6 +42,7 @@ def _generate_code() -> str:
 
 # Create a new short link for the given URL
 @app.post("/", response_model=LinkOut, status_code=201)
+@limiter.limit("10/minute")
 async def create_link(payload: LinkCreate, request: Request, db: AsyncSession = Depends(get_db)):
     for _ in range(MAX_CODE_ATTEMPTS):
         code = _generate_code()

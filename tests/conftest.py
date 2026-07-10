@@ -48,6 +48,14 @@ async def _clean_tables():
             await conn.execute(table.delete())
 
 
+@pytest_asyncio.fixture(autouse=True)
+async def _reset_rate_limiter():
+    # Rate limit storage is in-memory and shared across tests within the
+    # process, so reset it before each test to avoid cross-test bleed.
+    app.state.limiter.reset()
+    yield
+
+
 @pytest_asyncio.fixture
 async def client():
     transport = ASGITransport(app=app)
