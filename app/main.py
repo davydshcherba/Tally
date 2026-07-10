@@ -1,6 +1,7 @@
 import secrets
 import string
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -51,7 +52,7 @@ async def create_link(payload: LinkCreate, request: Request, db: AsyncSession = 
     else:
         raise HTTPException(status_code=500, detail="Could not generate a unique code")
 
-    link = LinkModel(code=code, original_url=str(payload.url))
+    link = LinkModel(code=code, original_url=str(payload.url), expires_at=payload.expires_at)
     db.add(link)
     await db.commit()
     await db.refresh(link)
@@ -61,6 +62,7 @@ async def create_link(payload: LinkCreate, request: Request, db: AsyncSession = 
         short_url=str(request.base_url) + link.code,
         original_url=link.original_url,
         created_at=link.created_at,
+        expires_at=link.expires_at,
     )
 
 # Return total/unique click counts for a short link
@@ -104,6 +106,9 @@ async def redirect(code: str, request: Request, db: AsyncSession = Depends(get_d
     link = await db.get(LinkModel, code)
     if link is None:
         raise HTTPException(status_code=404)
+
+    if link.expires_at is not None and link.expires_at <= datetime.now(timezone.utc):
+        raise HTTPException(status_code=410, detail="Link has expired")
 
     db.add(
         StatsModel(
