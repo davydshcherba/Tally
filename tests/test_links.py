@@ -46,6 +46,35 @@ async def test_create_link_422_for_invalid_url(client):
     assert resp.status_code == 422
 
 
+async def test_create_link_with_custom_alias(client):
+    resp = await client.post("/", json={"url": "https://example.com/page", "code": "my-alias"})
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["code"] == "my-alias"
+    assert body["short_url"].endswith("my-alias")
+
+    redirect_resp = await client.get("/my-alias")
+    assert redirect_resp.status_code == 302
+
+
+async def test_create_link_409_for_taken_alias(client):
+    first_resp = await client.post("/", json={"url": "https://example.com/page", "code": "taken"})
+    assert first_resp.status_code == 201
+
+    second_resp = await client.post("/", json={"url": "https://example.com/other", "code": "taken"})
+    assert second_resp.status_code == 409
+
+
+async def test_create_link_409_for_reserved_alias(client):
+    resp = await client.post("/", json={"url": "https://example.com/page", "code": "health"})
+    assert resp.status_code == 409
+
+
+async def test_create_link_422_for_invalid_alias_characters(client):
+    resp = await client.post("/", json={"url": "https://example.com/page", "code": "not valid!"})
+    assert resp.status_code == 422
+
+
 async def test_create_link_rate_limited_per_ip(client):
     for _ in range(10):
         resp = await client.post("/", json={"url": "https://example.com/page"})

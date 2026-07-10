@@ -20,6 +20,8 @@ from .schemas import LinkCreate, LinkOut
 CODE_ALPHABET = string.ascii_letters + string.digits
 CODE_LENGTH = 7
 MAX_CODE_ATTEMPTS = 5
+# codes that would collide with fixed routes if used as a custom alias
+RESERVED_CODES = {"health"}
 
 
 # Create DB tables on startup before the app starts serving requests
@@ -45,12 +47,17 @@ def _generate_code() -> str:
 @app.post("/", response_model=LinkOut, status_code=201)
 @limiter.limit("10/minute")
 async def create_link(payload: LinkCreate, request: Request, db: AsyncSession = Depends(get_db)):
-    for _ in range(MAX_CODE_ATTEMPTS):
-        code = _generate_code()
-        if await db.get(LinkModel, code) is None:
-            break
+    if payload.code is not None:
+        if payload.code in RESERVED_CODES or await db.get(LinkModel, payload.code) is not None:
+            raise HTTPException(status_code=409, detail="Code already in use")
+        code = payload.code
     else:
-        raise HTTPException(status_code=500, detail="Could not generate a unique code")
+        for _ in range(MAX_CODE_ATTEMPTS):
+            code = _generate_code()
+            if await db.get(LinkModel, code) is None:
+                break
+        else:
+            raise HTTPException(status_code=500, detail="Could not generate a unique code")
 
     link = LinkModel(code=code, original_url=str(payload.url), expires_at=payload.expires_at)
     db.add(link)
