@@ -81,6 +81,47 @@ async def test_redirect_succeeds_for_unexpired_link(client):
     assert redirect_resp.status_code == 302
 
 
+async def test_list_links_empty(client):
+    resp = await client.get("/")
+    assert resp.status_code == 200
+    assert resp.json() == {"items": [], "total": 0, "limit": 20, "offset": 0}
+
+
+async def test_list_links_pagination_newest_first(client):
+    codes = []
+    for i in range(3):
+        create_resp = await client.post("/", json={"url": f"https://example.com/page{i}"})
+        assert create_resp.status_code == 201
+        codes.append(create_resp.json()["code"])
+
+    first_page_resp = await client.get("/", params={"limit": 2, "offset": 0})
+    assert first_page_resp.status_code == 200
+    first_page = first_page_resp.json()
+    assert first_page["total"] == 3
+    assert first_page["limit"] == 2
+    assert first_page["offset"] == 0
+    assert len(first_page["items"]) == 2
+
+    second_page_resp = await client.get("/", params={"limit": 2, "offset": 2})
+    assert second_page_resp.status_code == 200
+    second_page = second_page_resp.json()
+    assert second_page["total"] == 3
+    assert len(second_page["items"]) == 1
+
+    listed_codes = [item["code"] for item in first_page["items"] + second_page["items"]]
+    assert sorted(listed_codes) == sorted(codes)
+
+    item = first_page["items"][0]
+    assert item["short_url"].endswith(item["code"])
+    assert item["original_url"].startswith("https://example.com/page")
+
+
+async def test_list_links_rejects_invalid_pagination_params(client):
+    assert (await client.get("/", params={"limit": 0})).status_code == 422
+    assert (await client.get("/", params={"limit": 101})).status_code == 422
+    assert (await client.get("/", params={"offset": -1})).status_code == 422
+
+
 async def test_unique_vs_total_click_counting(client):
     create_resp = await client.post("/", json={"url": "https://example.com/page"})
     code = create_resp.json()["code"]

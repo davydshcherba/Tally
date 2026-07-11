@@ -3,7 +3,7 @@ import string
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from . import models  # noqa: F401  register models in BaseModel.metadata
 from .db import get_db, init_models
 from .models import LinkModel, StatsModel
-from .schemas import LinkCreate, LinkOut
+from .schemas import LinkCreate, LinkList, LinkOut
 
 CODE_ALPHABET = string.ascii_letters + string.digits
 CODE_LENGTH = 7
@@ -63,6 +63,46 @@ async def create_link(payload: LinkCreate, request: Request, db: AsyncSession = 
         original_url=link.original_url,
         created_at=link.created_at,
         expires_at=link.expires_at,
+    )
+
+# List existing links, newest first, as a limit/offset page
+@app.get("/", response_model=LinkList)
+async def list_links(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+):
+    total = (await db.execute(select(func.count()).select_from(LinkModel))).scalar_one()
+
+    links = (
+        (
+            await db.execute(
+                select(LinkModel)
+                # tie-break on code so pages stay stable when created_at collides
+                .order_by(LinkModel.created_at.desc(), LinkModel.code)
+                .offset(offset)
+                .limit(limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    return LinkList(
+        items=[
+            LinkOut(
+                code=link.code,
+                short_url=str(request.base_url) + link.code,
+                original_url=link.original_url,
+                created_at=link.created_at,
+                expires_at=link.expires_at,
+            )
+            for link in links
+        ],
+        total=total,
+        limit=limit,
+        offset=offset,
     )
 
 # Return total/unique click counts for a short link

@@ -14,3 +14,10 @@ class LinkOut(BaseModel):
     original_url: HttpUrl
     created_at: datetime
     expires_at: datetime | None = None
+
+# Paginated response for GET /: one page of links plus paging metadata
+class LinkList(BaseModel):
+    items: list[LinkOut]
+    total: int
+    limit: int
+    offset: int
