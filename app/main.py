@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import models  # noqa: F401  register models in BaseModel.metadata
-from .db import get_db, init_models
+from .db import get_db, run_migrations
 from .models import LinkModel, StatsModel
 from .schemas import LinkCreate, LinkList, LinkOut
 
@@ -24,10 +24,10 @@ MAX_CODE_ATTEMPTS = 5
 RESERVED_CODES = {"health"}
 
 
-# Create DB tables on startup before the app starts serving requests
+# Apply pending DB migrations on startup before the app starts serving requests
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_models()
+    await run_migrations()
     yield
 
 

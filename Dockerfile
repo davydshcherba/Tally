@@ -8,6 +8,8 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-install-project --no-dev
 
 COPY app ./app
+COPY alembic.ini ./
+COPY migrations ./migrations
 
 RUN uv sync --locked --no-dev
 
