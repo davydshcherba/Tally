@@ -12,8 +12,9 @@ os.environ["DATABASE_URL"] = os.getenv(
 import asyncpg  # noqa: E402
 import pytest_asyncio  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
+from sqlalchemy import text  # noqa: E402
 
-from app.db import BaseModel, engine  # noqa: E402
+from app.db import BaseModel, engine, run_migrations  # noqa: E402
 from app.main import app  # noqa: E402
 
 MAINTENANCE_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/postgres"
@@ -34,8 +35,12 @@ async def _ensure_database_exists() -> None:
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def _database():
     await _ensure_database_exists()
+    # Rebuild the schema from scratch through Alembic so tests also verify
+    # that the migrations produce a working schema.
     async with engine.begin() as conn:
-        await conn.run_sync(BaseModel.metadata.create_all)
+        await conn.run_sync(BaseModel.metadata.drop_all)
+        await conn.execute(text("DROP TABLE IF EXISTS alembic_version"))
+    await run_migrations()
     yield
     await engine.dispose()
 
