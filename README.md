@@ -25,6 +25,17 @@ A fast, self-hosted URL shortener with built-in click analytics.
 
 ## Getting started
 
+### Configure credentials
+
+Database credentials are read from a `.env` file (used by both Docker Compose and the app):
+
+```bash
+cp .env.example .env
+# edit .env — at minimum set a real POSTGRES_PASSWORD for anything beyond local dev
+```
+
+Without a `.env`, everything falls back to the local-dev defaults (`postgres`/`postgres`).
+
 ### Run with Docker Compose (recommended)
 
 ```bash
@@ -48,7 +59,7 @@ uv sync
 uv run uvicorn app.main:app --reload
 ```
 
-By default the app connects to `postgresql+asyncpg://postgres:postgres@localhost:5432/postgres`. Override this with the `DATABASE_URL` environment variable.
+The app builds its connection string from the `POSTGRES_*` variables in `.env` (falling back to `postgres`/`postgres` on `localhost:5432`). Setting `DATABASE_URL` directly overrides all of them.
 
 ### Run tests
 
