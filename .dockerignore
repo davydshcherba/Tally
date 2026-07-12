@@ -1,0 +1,31 @@
+# Git
+.git/
+.github/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Environment
+.env
+
+# Editor / OS
+.vscode/
+.claude/
+.DS_Store
+.cursorrules
+.cursorignore
+.cursorignore.md
+
+# Project extras not needed in the image
+tests/
+images/
+README.md
+LICENSE
+Dockerfile
+docker-compose.yml
+.dockerignore
