@@ -1,9 +1,10 @@
+import os
 import secrets
 import string
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -43,6 +44,18 @@ def _generate_code() -> str:
     return "".join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LENGTH))
 
 
+# Guard for admin endpoints (list/delete): requires the X-API-Key header to
+# match the API_KEY env var. Fails closed with 503 when no key is configured.
+def require_api_key(x_api_key: str | None = Header(None)) -> None:
+    expected = os.getenv("API_KEY")
+    if not expected:
+        raise HTTPException(status_code=503, detail="API_KEY is not configured")
+    if x_api_key is None or not secrets.compare_digest(
+        x_api_key.encode(), expected.encode()
+    ):
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+
+
 # Create a new short link for the given URL
 @app.post("/", response_model=LinkOut, status_code=201)
 @limiter.limit("10/minute")
@@ -73,7 +86,7 @@ async def create_link(payload: LinkCreate, request: Request, db: AsyncSession = 
     )
 
 # List existing links, newest first, as a limit/offset page
-@app.get("/", response_model=LinkList)
+@app.get("/", response_model=LinkList, dependencies=[Depends(require_api_key)])
 async def list_links(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -131,7 +144,7 @@ async def get_stats(code: str, db: AsyncSession = Depends(get_db)):
     return {"code": code, "total_clicks": total, "unique_clicks": unique}
 
 # Delete a short link by its code
-@app.delete("/{code}", status_code=204)
+@app.delete("/{code}", status_code=204, dependencies=[Depends(require_api_key)])
 async def delete_link(code: str, db: AsyncSession = Depends(get_db)):
     link = await db.get(LinkModel, code)
     if link is None:

@@ -36,6 +36,8 @@ cp .env.example .env
 
 Without a `.env`, everything falls back to the local-dev defaults (`postgres`/`postgres`).
 
+The admin endpoints (listing and deleting links) are protected by an API key: set `API_KEY` in `.env` and pass it in the `X-API-Key` header. While `API_KEY` is unset, those endpoints are disabled and respond with `503`.
+
 ### Run with Docker Compose (recommended)
 
 ```bash
@@ -74,13 +76,20 @@ Both run on every pull request via [GitHub Actions](.github/workflows/ci.yml).
 
 ## API reference
 
-| Method   | Path           | Description                                    |
-|----------|----------------|-------------------------------------------------|
-| `POST`   | `/`            | Create a short link for a given URL             |
-| `GET`    | `/{code}`      | Redirect to the original URL and log the click  |
-| `GET`    | `/{code}/stats`| Get total and unique click counts for a link    |
-| `DELETE` | `/{code}`      | Delete a short link                             |
-| `GET`    | `/health`      | Liveness check                                  |
+| Method   | Path           | Auth        | Description                                    |
+|----------|----------------|-------------|-------------------------------------------------|
+| `POST`   | `/`            | —           | Create a short link for a given URL             |
+| `GET`    | `/`            | `X-API-Key` | List existing links (paginated)                 |
+| `GET`    | `/{code}`      | —           | Redirect to the original URL and log the click  |
+| `GET`    | `/{code}/stats`| —           | Get total and unique click counts for a link    |
+| `DELETE` | `/{code}`      | `X-API-Key` | Delete a short link                             |
+| `GET`    | `/health`      | —           | Liveness check                                  |
+
+Authenticated endpoints require the `X-API-Key` header matching the `API_KEY` env var:
+
+```bash
+curl -H "X-API-Key: $API_KEY" http://localhost:8000/
+```
 
 ### Create a link
 

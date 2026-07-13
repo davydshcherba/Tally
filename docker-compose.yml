@@ -24,6 +24,8 @@ services:
     restart: always
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-postgres}
+      # no default on purpose: admin endpoints stay disabled (503) until a key is set
+      API_KEY: ${API_KEY:-}
     ports:
       - "8000:8000"
     depends_on:
