@@ -151,6 +151,47 @@ async def test_list_links_rejects_invalid_pagination_params(client):
     assert (await client.get("/", params={"offset": -1})).status_code == 422
 
 
+async def test_list_links_401_without_api_key(anon_client):
+    resp = await anon_client.get("/")
+    assert resp.status_code == 401
+
+
+async def test_delete_401_without_api_key(client, anon_client):
+    create_resp = await client.post("/", json={"url": "https://example.com/page"})
+    code = create_resp.json()["code"]
+
+    resp = await anon_client.delete(f"/{code}")
+    assert resp.status_code == 401
+
+    # the link must survive a rejected delete
+    assert (await client.get(f"/{code}/stats")).status_code == 200
+
+
+async def test_admin_endpoints_401_with_wrong_api_key(client):
+    resp = await client.get("/", headers={"X-API-Key": "wrong-key"})
+    assert resp.status_code == 401
+
+    resp = await client.delete("/whatever", headers={"X-API-Key": "wrong-key"})
+    assert resp.status_code == 401
+
+
+async def test_admin_endpoints_503_when_api_key_unconfigured(client, monkeypatch):
+    monkeypatch.delenv("API_KEY")
+
+    assert (await client.get("/")).status_code == 503
+    assert (await client.delete("/whatever")).status_code == 503
+
+
+async def test_unauthenticated_endpoints_work_without_api_key(anon_client):
+    create_resp = await anon_client.post("/", json={"url": "https://example.com/page"})
+    assert create_resp.status_code == 201
+    code = create_resp.json()["code"]
+
+    assert (await anon_client.get(f"/{code}")).status_code == 302
+    assert (await anon_client.get(f"/{code}/stats")).status_code == 200
+    assert (await anon_client.get("/health")).status_code == 200
+
+
 async def test_unique_vs_total_click_counting(client):
     create_resp = await client.post("/", json={"url": "https://example.com/page"})
     code = create_resp.json()["code"]

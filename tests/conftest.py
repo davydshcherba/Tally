@@ -9,6 +9,11 @@ os.environ["DATABASE_URL"] = os.getenv(
     f"postgresql+asyncpg://postgres:postgres@localhost:5432/{TEST_DB_NAME}",
 )
 
+# Key the admin endpoints (list/delete) expect; the `client` fixture sends it
+# by default, `anon_client` doesn't.
+TEST_API_KEY = "test-api-key"
+os.environ["API_KEY"] = TEST_API_KEY
+
 import asyncpg  # noqa: E402
 import pytest_asyncio  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
@@ -63,6 +68,16 @@ async def _reset_rate_limiter():
 
 @pytest_asyncio.fixture
 async def client():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(
+        transport=transport, base_url="http://test", headers={"X-API-Key": TEST_API_KEY}
+    ) as ac:
+        yield ac
+
+
+@pytest_asyncio.fixture
+async def anon_client():
+    """Client without the X-API-Key header — for testing auth rejections."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
