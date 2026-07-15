@@ -54,8 +54,8 @@ async def run_async_migrations() -> None:
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode.
 
-    The app's startup (see app.db.run_migrations) passes its own connection
-    via config.attributes; the alembic CLI path creates a fresh engine.
+    The test suite (see tests/conftest.py) passes its own connection via
+    config.attributes; the alembic CLI path creates a fresh engine.
     """
     connection = config.attributes.get("connection")
     if connection is not None:

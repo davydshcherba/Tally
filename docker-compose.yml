@@ -18,6 +18,18 @@ services:
       timeout: 5s
       retries: 5
 
+  # One-shot deploy step: applies pending Alembic migrations, then exits.
+  # Runs once per `docker compose up`, so API replicas never race to migrate.
+  migrate:
+    build: .
+    container_name: tally_migrate
+    command: ["uv", "run", "--no-dev", "alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-postgres}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     build: .
     container_name: tally_api
@@ -29,8 +41,8 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:

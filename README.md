@@ -44,7 +44,7 @@ The admin endpoints (listing and deleting links) are protected by an API key: se
 docker compose up -d --build
 ```
 
-This starts PostgreSQL and the API together. The API is available at `http://localhost:8000`.
+This starts PostgreSQL, applies database migrations as a one-shot `migrate` service, and then starts the API. The API is available at `http://localhost:8000`.
 
 ### Run locally
 
@@ -56,6 +56,9 @@ docker compose up -d postgres
 
 # install dependencies
 uv sync
+
+# apply database migrations (the app no longer migrates on startup)
+uv run alembic upgrade head
 
 # run the API with auto-reload
 uv run uvicorn app.main:app --reload
