@@ -1,7 +1,6 @@
 import os
 import secrets
 import string
-from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
@@ -14,7 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import models  # noqa: F401  register models in BaseModel.metadata
-from .db import get_db, run_migrations
+from .db import get_db
 from .models import LinkModel, StatsModel
 from .schemas import LinkCreate, LinkList, LinkOut
 
@@ -24,15 +23,9 @@ MAX_CODE_ATTEMPTS = 5
 # codes that would collide with fixed routes if used as a custom alias
 RESERVED_CODES = {"health"}
 
-
-# Apply pending DB migrations on startup before the app starts serving requests
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await run_migrations()
-    yield
-
-
-app = FastAPI(lifespan=lifespan)
+# Migrations are applied as a separate deploy step (`alembic upgrade head`),
+# not on app startup — see docker-compose.yml's `migrate` service.
+app = FastAPI()
 
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter

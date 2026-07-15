@@ -14,15 +14,28 @@ os.environ["DATABASE_URL"] = os.getenv(
 TEST_API_KEY = "test-api-key"
 os.environ["API_KEY"] = TEST_API_KEY
 
+from pathlib import Path  # noqa: E402
+
 import asyncpg  # noqa: E402
 import pytest_asyncio  # noqa: E402
+from alembic import command  # noqa: E402
+from alembic.config import Config  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
-from sqlalchemy import text  # noqa: E402
+from sqlalchemy import Connection, text  # noqa: E402
 
-from app.db import BaseModel, engine, run_migrations  # noqa: E402
+from app.db import BaseModel, engine  # noqa: E402
 from app.main import app  # noqa: E402
 
 MAINTENANCE_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/postgres"
+
+ALEMBIC_INI = Path(__file__).resolve().parent.parent / "alembic.ini"
+
+
+def _upgrade_to_head(connection: Connection) -> None:
+    cfg = Config(str(ALEMBIC_INI))
+    # hand our connection to migrations/env.py so it doesn't open its own
+    cfg.attributes["connection"] = connection
+    command.upgrade(cfg, "head")
 
 
 async def _ensure_database_exists() -> None:
@@ -45,7 +58,9 @@ async def _database():
     async with engine.begin() as conn:
         await conn.run_sync(BaseModel.metadata.drop_all)
         await conn.execute(text("DROP TABLE IF EXISTS alembic_version"))
-    await run_migrations()
+    async with engine.begin() as conn:
+        # alembic's command API is sync, so it needs run_sync on the async connection
+        await conn.run_sync(_upgrade_to_head)
     yield
     await engine.dispose()
 
