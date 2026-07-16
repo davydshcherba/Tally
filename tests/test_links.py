@@ -1,5 +1,9 @@
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import update
+
+from app.db import engine
+from app.models import LinkModel
 from tests.conftest import make_client
 
 
@@ -89,13 +93,34 @@ async def test_create_link_rate_limited_per_ip(client):
 
 
 async def test_redirect_410_for_expired_link(client):
-    past = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
-    create_resp = await client.post("/", json={"url": "https://example.com/page", "expires_at": past})
+    future = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
+    create_resp = await client.post("/", json={"url": "https://example.com/page", "expires_at": future})
     assert create_resp.status_code == 201
     code = create_resp.json()["code"]
 
+    # the API refuses to create already-expired links, so backdate the row
+    async with engine.begin() as conn:
+        await conn.execute(
+            update(LinkModel)
+            .where(LinkModel.code == code)
+            .values(expires_at=datetime.now(timezone.utc) - timedelta(minutes=1))
+        )
+
     redirect_resp = await client.get(f"/{code}")
     assert redirect_resp.status_code == 410
+
+
+async def test_create_link_422_for_past_expiry(client):
+    past = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
+    resp = await client.post("/", json={"url": "https://example.com/page", "expires_at": past})
+    assert resp.status_code == 422
+
+
+async def test_create_link_422_for_naive_expiry(client):
+    # no timezone offset — must be rejected instead of silently treated as UTC
+    naive_future = (datetime.now() + timedelta(days=1)).isoformat()
+    resp = await client.post("/", json={"url": "https://example.com/page", "expires_at": naive_future})
+    assert resp.status_code == 422
 
 
 async def test_redirect_succeeds_for_unexpired_link(client):
