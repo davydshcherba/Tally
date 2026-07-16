@@ -10,8 +10,9 @@ A fast, self-hosted URL shortener with built-in click analytics.
 
 ## Features
 
-- Shorten any URL to a compact, random 7-character code
+- Shorten any URL to a compact, random 7-character code — or pick a custom alias
 - Redirect visitors from the short code to the original URL
+- Optional expiration: expired links stop redirecting and answer `410 Gone`
 - Track total and unique (per-IP) clicks for every link
 - Delete links on demand
 - Async FastAPI + PostgreSQL, ready to run with a single `docker compose up`
@@ -83,7 +84,7 @@ Both run on every pull request via [GitHub Actions](.github/workflows/ci.yml).
 |----------|----------------|-------------|-------------------------------------------------|
 | `POST`   | `/`            | —           | Create a short link for a given URL             |
 | `GET`    | `/`            | `X-API-Key` | List existing links (paginated)                 |
-| `GET`    | `/{code}`      | —           | Redirect to the original URL and log the click  |
+| `GET`    | `/{code}`      | —           | Redirect to the original URL and log the click (`410` if the link has expired) |
 | `GET`    | `/{code}/stats`| —           | Get total and unique click counts for a link    |
 | `DELETE` | `/{code}`      | `X-API-Key` | Delete a short link                             |
 | `GET`    | `/health`      | —           | Liveness check                                  |
@@ -107,9 +108,39 @@ curl -X POST http://localhost:8000/ \
   "code": "mFEIt3m",
   "short_url": "http://localhost:8000/mFEIt3m",
   "original_url": "https://example.com/some/page",
-  "created_at": "2026-07-09T07:29:17.476624"
+  "created_at": "2026-07-09T07:29:17.476624",
+  "expires_at": null
 }
 ```
+
+Only `url` is required. Optional fields:
+
+| Field        | Description                                                                                                                                                            |
+|--------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `expires_at` | Expiration timestamp. Must be timezone-aware (e.g. `2026-08-01T12:00:00+03:00` or a `Z` suffix) and in the future — otherwise the request is rejected with `422`. Once past, the link stops redirecting and answers `410 Gone`. |
+| `code`       | Custom alias to use instead of a random code: 1–32 characters from `A–Z a–z 0–9 _ -`. Responds `409` if the alias is already taken or reserved.                          |
+
+```bash
+curl -X POST http://localhost:8000/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com/summer-sale",
+    "expires_at": "2026-08-01T12:00:00+03:00",
+    "code": "summer-sale"
+  }'
+```
+
+```json
+{
+  "code": "summer-sale",
+  "short_url": "http://localhost:8000/summer-sale",
+  "original_url": "https://example.com/summer-sale",
+  "created_at": "2026-07-16T19:35:02.123456",
+  "expires_at": "2026-08-01T09:00:00Z"
+}
+```
+
+Note that timestamps are stored and returned in UTC (`expires_at` above is the same moment as the `+03:00` input).
 
 ### Get click stats
 
