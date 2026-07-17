@@ -55,6 +55,9 @@ Requires Python 3.12+, [uv](https://docs.astral.sh/uv/), and a running PostgreSQ
 # start just the database
 docker compose up -d postgres
 
+# all backend commands run from the backend/ directory
+cd backend
+
 # install dependencies
 uv sync
 
@@ -74,6 +77,7 @@ Set `SQL_ECHO=true` to log every SQL statement the app issues — useful for loc
 Requires a running PostgreSQL instance (`docker compose up -d postgres`). Tests run against a separate `tally_test` database, created automatically on first run.
 
 ```bash
+cd backend
 uv run ruff check .   # lint
 uv run pytest         # tests
 ```
