@@ -27,8 +27,11 @@ def _database_url_from_env() -> str:
 
 DATABASE_URL = _database_url_from_env()
 
-# Connection pool to the database; echo=True logs every SQL statement (handy for debugging)
-engine = create_async_engine(DATABASE_URL, echo=True)
+# SQL_ECHO=true logs every SQL statement (handy for debugging, too noisy for production)
+SQL_ECHO = os.getenv("SQL_ECHO", "false").lower() in ("1", "true", "yes")
+
+# Connection pool to the database
+engine = create_async_engine(DATABASE_URL, echo=SQL_ECHO)
 # Factory for per-request sessions; expire_on_commit=False keeps loaded objects usable after commit
 async_session = async_sessionmaker(engine, expire_on_commit=False)
 

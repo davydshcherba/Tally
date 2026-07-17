@@ -67,6 +67,8 @@ uv run uvicorn app.main:app --reload
 
 The app builds its connection string from the `POSTGRES_*` variables in `.env` (falling back to `postgres`/`postgres` on `localhost:5432`). Setting `DATABASE_URL` directly overrides all of them.
 
+Set `SQL_ECHO=true` to log every SQL statement the app issues — useful for local debugging, but leave it off (the default) in production.
+
 ### Run tests
 
 Requires a running PostgreSQL instance (`docker compose up -d postgres`). Tests run against a separate `tally_test` database, created automatically on first run.
