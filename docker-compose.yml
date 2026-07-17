@@ -21,7 +21,7 @@ services:
   # One-shot deploy step: applies pending Alembic migrations, then exits.
   # Runs once per `docker compose up`, so API replicas never race to migrate.
   migrate:
-    build: .
+    build: ./backend
     container_name: tally_migrate
     command: ["uv", "run", "--no-dev", "alembic", "upgrade", "head"]
     environment:
@@ -31,7 +31,7 @@ services:
         condition: service_healthy
 
   api:
-    build: .
+    build: ./backend
     container_name: tally_api
     restart: always
     environment:
