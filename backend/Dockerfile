@@ -1,6 +1,8 @@
-FROM python:3.12-slim
+# --- Build stage: install dependencies into /app/.venv with uv ---
+FROM python:3.12-slim AS builder
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# Pinned uv version for reproducible builds
+COPY --from=ghcr.io/astral-sh/uv:0.11.21 /uv /uvx /bin/
 
 WORKDIR /app
 
@@ -13,6 +15,23 @@ COPY migrations ./migrations
 
 RUN uv sync --locked --no-dev
 
+# --- Runtime stage: no uv, no build tooling, non-root user ---
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN useradd --create-home --shell /usr/sbin/nologin appuser
+
+COPY --from=builder --chown=appuser:appuser /app /app
+
+# Put the venv on PATH so uvicorn/alembic run without uv
+ENV PATH="/app/.venv/bin:$PATH"
+
+USER appuser
+
 EXPOSE 8000
 
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
