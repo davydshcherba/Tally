@@ -23,7 +23,8 @@ services:
   migrate:
     build: ./backend
     container_name: tally_migrate
-    command: ["uv", "run", "--no-dev", "alembic", "upgrade", "head"]
+    # the runtime image has no uv; the venv is on PATH, so call alembic directly
+    command: ["alembic", "upgrade", "head"]
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-postgres}
     depends_on:
